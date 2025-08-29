@@ -6,6 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,15 +17,200 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ChessBoard()
+            val board = remember { mutableStateOf(initialBoard()) }
+            var selectedSquare by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+            var isWhiteTurn by remember { mutableStateOf(true) }
+
+            // Check/Checkmate flags
+            var whiteInCheck by remember { mutableStateOf(false) }
+            var blackInCheck by remember { mutableStateOf(false) }
+            var whiteCheckmate by remember { mutableStateOf(false) }
+            var blackCheckmate by remember { mutableStateOf(false) }
+
+            ChessAppUI(
+                board = board.value,
+                onSquareClick = { row, col ->
+                    val piece = board.value[row][col]
+
+                    if (selectedSquare == null) {
+                        // First click = select a piece
+                        if (piece != null) {
+                            // Only allow correct turn
+                            val isWhitePiece = piece in listOf("♙","♖","♘","♗","♕","♔")
+                            if (isWhiteTurn && isWhitePiece || !isWhiteTurn && !isWhitePiece) {
+                                selectedSquare = row to col
+                            }
+                        }
+                    } else {
+                        // Second click = attempt to move
+                        val (fromRow, fromCol) = selectedSquare!!
+                        val selectedPiece = board.value[fromRow][fromCol]
+
+                        if (selectedPiece != null) {
+                            val isValid = isValidMove(
+                                selectedPiece, fromRow, fromCol, row, col, board.value
+                            )
+
+                            if (isValid) {
+                                val newBoard = board.value.map { it.copyOf() }.toTypedArray()
+                                newBoard[row][col] = selectedPiece
+                                newBoard[fromRow][fromCol] = null
+
+                                // ✅ Pawn promotion
+                                if (selectedPiece == "♙" && row == 0) newBoard[row][col] = "♕"
+                                if (selectedPiece == "♟" && row == 7) newBoard[row][col] = "♛"
+
+                                // Update board + turn
+                                board.value = newBoard
+                                isWhiteTurn = !isWhiteTurn
+                            }
+                        }
+                        selectedSquare = null
+                    }
+                },
+                whiteInCheck = whiteInCheck,
+                blackInCheck = blackInCheck,
+                onRestart = {
+                    board.value = initialBoard()
+                    selectedSquare = null
+                    isWhiteTurn = true
+                    whiteInCheck = false
+                    blackInCheck = false
+                }
+            )
         }
     }
 }
 
+
+
+@Composable
+fun ChessAppUI(
+    board: Array<Array<String?>>,
+    onSquareClick: (row: Int, col: Int) -> Unit,
+    whiteInCheck: Boolean,
+    blackInCheck: Boolean,
+    onRestart: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFAFAFA))
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Title
+        Text(
+            text = "♟ Chess Game",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        // ✅ Chessboard UI
+        ChessBoardUI(board = board, onSquareClick = onSquareClick)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ✅ Game Status
+        if (whiteInCheck) {
+            Text("⚠ White is in Check!", color = Color.Red, fontSize = 18.sp)
+        } else if (blackInCheck) {
+            Text("⚠ Black is in Check!", color = Color.Red, fontSize = 18.sp)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ✅ Restart button
+        Button(
+            onClick = { onRestart() },
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth(0.6f)
+        ) {
+            Text("Restart Game")
+        }
+    }
+}
+
+
+
+@Composable
+fun ChessBoardUI(board: Array<Array<String?>>, onSquareClick: (Int, Int) -> Unit) {
+    Column {
+        for (row in 0..7) {
+            Row {
+                for (col in 0..7) {
+                    val piece = board[row][col]
+                    val isLightSquare = (row + col) % 2 == 0
+                    val squareColor = if (isLightSquare) Color(0xFFFFEB3B) else Color(0xFF779556)
+
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(squareColor)
+                            .clickable { onSquareClick(row, col) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (piece != null) {
+                            Text(
+                                text = piece,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+fun initialBoard(): Array<Array<String?>> {
+    return arrayOf(
+        arrayOf("♜","♞","♝","♛","♚","♝","♞","♜"),
+        arrayOf("♟","♟","♟","♟","♟","♟","♟","♟"),
+        arrayOfNulls(8),
+        arrayOfNulls(8),
+        arrayOfNulls(8),
+        arrayOfNulls(8),
+        arrayOf("♙","♙","♙","♙","♙","♙","♙","♙"),
+        arrayOf("♖","♘","♗","♕","♔","♗","♘","♖")
+    )
+}
+
+
+
+
+
+fun isCastlingMove(
+    piece: String,
+    fromRow: Int, fromCol: Int,
+    toRow: Int, toCol: Int,
+    board: Array<Array<String?>>
+): Boolean {
+    // Only king can castle
+    if (piece != "♔" && piece != "♚") return false
+
+    // Must stay in same row
+    if (fromRow != toRow) return false
+
+    // King must move exactly 2 squares horizontally
+    if (kotlin.math.abs(toCol - fromCol) != 2) return false
+
+    return true
+}
+
+
+//commit after every new funcitionlity addition
 fun isValidMove(
     piece: String,
     startRow: Int,
@@ -143,7 +330,7 @@ fun isValidKnightMove(
     board: Array<Array<String?>>        // current chessboard state
 ): Boolean {
     // STEP 1: calculate row and column difference
-    val rowDiff = kotlin.math.abs(toRow - fromRow)
+    val rowDiff = kotlin.math.abs(toRow - fromRow)// checking absolute value
     val colDiff = kotlin.math.abs(toCol - fromCol)
 
     // STEP 2: Knight must move in an "L" shape:
@@ -420,6 +607,15 @@ fun ChessBoard() {
     var whiteCheckmate by remember { mutableStateOf(false) }
     var blackCheckmate by remember { mutableStateOf(false) }
 
+
+    // Track if rooks and kings have moved
+    var whiteKingMoved by remember { mutableStateOf(false) }
+    var blackKingMoved by remember { mutableStateOf(false) }
+    var whiteRookLeftMoved by remember { mutableStateOf(false) }
+    var whiteRookRightMoved by remember { mutableStateOf(false) }
+    var blackRookLeftMoved by remember { mutableStateOf(false) }
+    var blackRookRightMoved by remember { mutableStateOf(false) }
+
     Column {
         // Show messages
         if (whiteInCheck) Text("White King in Check!", color = Color.Red, fontWeight = FontWeight.Bold)
@@ -477,25 +673,92 @@ fun ChessBoard() {
                                 val isValid = isValidMove(selectedPiece, selectedRow, selectedCol, targetRow, targetCol, board.value)
 
                                 if (isValid) {
-                                    //copy board
+                                    // Copy the current board to a new one
                                     val newBoard = board.value.map { it.copyOf() }.toTypedArray()
-                                    //move piece
-                                    newBoard[targetRow][targetCol] = selectedPiece
+
+                                    // Save the selected piece before moving
+                                    val movingPiece = selectedPiece
+
+                                    // Move the piece
+                                    newBoard[targetRow][targetCol] = movingPiece
                                     newBoard[selectedRow][selectedCol] = null
 
-                                    //update board
+                                    // 🏰 Handle Castling
+                                    if (isCastlingMove(movingPiece!!, selectedRow, selectedCol, targetRow, targetCol, board.value)) {
+                                        val newBoard = board.value.map { it.copyOf() }.toTypedArray()
+
+                                        if (movingPiece == "♔") { // White King
+                                            if (targetCol == 6 && !whiteKingMoved && !whiteRookRightMoved) {
+                                                // Short castling (e1 → g1 with rook h1 → f1)
+                                                newBoard[7][6] = "♔" // King moves
+                                                newBoard[7][5] = "♖" // Rook moves
+                                                newBoard[7][4] = null
+                                                newBoard[7][7] = null
+                                            } else if (targetCol == 2 && !whiteKingMoved && !whiteRookLeftMoved) {
+                                                // Long castling (e1 → c1 with rook a1 → d1)
+                                                newBoard[7][2] = "♔"
+                                                newBoard[7][3] = "♖"
+                                                newBoard[7][4] = null
+                                                newBoard[7][0] = null
+                                            }
+                                        } else if (movingPiece == "♚") { // Black King
+                                            if (targetCol == 6 && !blackKingMoved && !blackRookRightMoved) {
+                                                // Short castling (e8 → g8 with rook h8 → f8)
+                                                newBoard[0][6] = "♚"
+                                                newBoard[0][5] = "♜"
+                                                newBoard[0][4] = null
+                                                newBoard[0][7] = null
+                                            } else if (targetCol == 2 && !blackKingMoved && !blackRookLeftMoved) {
+                                                // Long castling (e8 → c8 with rook a8 → d8)
+                                                newBoard[0][2] = "♚"
+                                                newBoard[0][3] = "♜"
+                                                newBoard[0][4] = null
+                                                newBoard[0][0] = null
+                                            }
+                                        }
+
+                                        // Update board and state
+                                        board.value = newBoard
+                                        selectedSquare = null
+                                        isWhiteTurn = !isWhiteTurn
+                                        if (whiteKingMoved || whiteRookLeftMoved) {
+                                            return@Square
+                                        }
+
+                                        // Exit early, no need for normal move
+                                    }
+
+
+                                    // 🟢 Pawn Promotion Rule
+                                    if (movingPiece == "♙" && targetRow == 0) {
+                                        // White pawn reached last row → promote to Queen
+                                        newBoard[targetRow][targetCol] = "♕"
+                                    }
+                                    if (movingPiece == "♟" && targetRow == 7) {
+                                        // Black pawn reached last row → promote to Queen
+                                        newBoard[targetRow][targetCol] = "♛"
+                                    }
+
+                                    // Update board so UI reflects the change
                                     board.value = newBoard
+
+                                    // Clear selection (turn completed)
                                     selectedSquare = null
+
+                                    // Switch turns
                                     isWhiteTurn = !isWhiteTurn
 
-                                    // Update king status
+                                    // ✅ Re-check king status after the move
                                     whiteInCheck = isKingInCheck(true, board.value)
                                     blackInCheck = isKingInCheck(false, board.value)
                                     whiteCheckmate = isCheckmate(true, board.value)
                                     blackCheckmate = isCheckmate(false, board.value)
+
                                 } else {
+                                    // Invalid move → deselect
                                     selectedSquare = null
                                 }
+
                             }
                         }
 
