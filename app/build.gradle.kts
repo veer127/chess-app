@@ -8,11 +8,14 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.chessapp"
-        minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        applicationId = "com.sikho" +
+                ".chessapp"   // unique app ID, don’t change after publishing
+        versionCode = 1                       // integer; must increase with each update
+        versionName = "1.0.0"                 // shown to users
+
+        minSdk = 24                           // minimum Android version supported
+        targetSdk = 34                        // target latest version installed
+
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

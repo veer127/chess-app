@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.dp
 
 
 
@@ -42,7 +44,7 @@ class MainActivity : ComponentActivity() {
                         // First click = select a piece
                         if (piece != null) {
                             // Only allow correct turn
-                            val isWhitePiece = piece in listOf("♙","♖","♘","♗","♕","♔")
+                            val isWhitePiece = piece in listOf("♙", "♖", "♘", "♗", "♕", "♔")
                             if (isWhiteTurn && isWhitePiece || !isWhiteTurn && !isWhitePiece) {
                                 selectedSquare = row to col
                             }
@@ -87,7 +89,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
 
 
 @Composable
@@ -140,30 +141,45 @@ fun ChessAppUI(
 }
 
 
-
 @Composable
 fun ChessBoardUI(board: Array<Array<String?>>, onSquareClick: (Int, Int) -> Unit) {
-    Column {
-        for (row in 0..7) {
-            Row {
-                for (col in 0..7) {
-                    val piece = board[row][col]
-                    val isLightSquare = (row + col) % 2 == 0
-                    val squareColor = if (isLightSquare) Color(0xFFFFEB3B) else Color(0xFF779556)
+    // Make the board size based on available space so it always fits the screen
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()         // try to use full width
+            .padding(4.dp)         // optional small padding
+    ) {
+        // maxWidth and maxHeight are Dp values available inside BoxWithConstraints
+        val boardSize = if (maxWidth < maxHeight) maxWidth else maxHeight
+        val squareSize = boardSize / 8f
 
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .background(squareColor)
-                            .clickable { onSquareClick(row, col) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (piece != null) {
-                            Text(
-                                text = piece,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+        // Center the board horizontally
+        Column(modifier = Modifier
+            .width(boardSize)
+            .height(boardSize)
+            .align(Alignment.Center)
+        ) {
+            for (row in 0..7) {
+                Row {
+                    for (col in 0..7) {
+                        val piece = board[row][col]
+                        val isLightSquare = (row + col) % 2 == 0
+                        val squareColor = if (isLightSquare) Color(0xFFFFEB3B) else Color(0xFF779556)
+
+                        Box(
+                            modifier = Modifier
+                                .size(squareSize)                        // same size for every square
+                                .background(squareColor)
+                                .clickable { onSquareClick(row, col) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (piece != null) {
+                                Text(
+                                    text = piece,
+                                    fontSize = (squareSize.value * 0.45).sp, // scale font with square
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
