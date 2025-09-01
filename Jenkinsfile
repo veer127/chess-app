@@ -11,8 +11,8 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main',
-                    url: 'https://github.com/your-username/ChessApp.git',
-                    credentialsId: 'your-github-credentials-id'
+                    url: 'https://github.com/veer127/chess-app',
+                    credentialsId: 'veer127'
             }
         }
 
