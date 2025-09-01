@@ -27,12 +27,24 @@ pipeline {
                 archiveArtifacts artifacts: 'app/build/outputs/apk/debug/app-debug.apk', fingerprint: true
             }
         }
+        stage('Build Release APK') {
+            steps {
+                sh './gradlew assembleRelease'
+            }
+        }
+
+        stage('Archive Release APK') {
+            steps {
+                archiveArtifacts artifacts: 'app/build/outputs/apk/release/app-release-unsigned.apk', fingerprint: true
+            }
+        }
     }
 
     post {
         success {
-            echo 'Build finished successfully!'
+            echo '✅ Both Debug and Release APKs built successfully!'
         }
+
         failure {
             echo 'Build failed. Check logs.'
         }
